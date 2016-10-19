@@ -1,42 +1,34 @@
 version: '2'
 services:
-  lb:
-    restart: always
-    image: 'dockercloud/haproxy:latest'
-    networks:
-      - front
-    links:
-      - web
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /etc/letsencrypt/live/claroline.loc/fullchain.pem:/certs/fullchain.pem
-    environment:
-      CERT_FOLDER: /certs/
-      FORCE_SSL: true
-
   web:
     restart: always
     build: web/
-    networks:
-      - front
-      - back
+    ports:
+      - '80:80'
+    #  - '8080:8080'
     volumes:
-      - data:/var/www/html/claroline
-    volumes_from:
-      - lb
+      - ./claroline:/var/www/html/claroline:rw
     environment:
-      VIRTUAL_HOST: https://claroline.loc
+      VIRTUAL_HOST: http://claroline.loc
+      #TCP_PORTS: '8080'
+      #VIRTUAL_HOST: http://claroline.loc, https://claroline.loc
+
+  webpack:
+     restart: always
+     image: bsolut/webpack
+     ports:
+       - '127.0.0.1:8080:8080'
+     volumes:
+       - ./claroline:/var/www
+     command: "node_modules/webpack-dev-server/bin/webpack-dev-server.js --hot --inline --content-base web --claro-tgt=watch --display-error-details"
+     environment:
+       TMPDIR: '/tmp'
 
   db:
     restart: always
-    image: mysql
-    networks:
-      - back
+    image: mysql:5.7
     volumes:
-      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+      #- ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
       - mysql:/var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -44,22 +36,44 @@ services:
       MYSQL_PASSWORD: claroline
       MYSQL_DATABASE: claroline
 
-  chat:
-    restart: always
-    image: prosody/prosody
-    ports:
-      - '81:80'
-      - '5222:5222'
 
-  tools:
-    build: tools/
-    volumes:
-      - data:/var/www/html/claroline
 
-networks:
-  front:
-  back:
+  #elasticsearch:
+  #   restart: always
+  #   image: elasticsearch:5.0
+  #   networks:
+  #     - elk
+  #   ports:
+  #     - '9200:9200'
+  #     - '9300:9300'
+  #
+  # logstash:
+  #   restart: always
+  #   image: logstash:5.0
+  #   ports:
+  #     - '12201:12201'
+  #   networks:
+  #     - elk
+  #   links:
+  #     - elasticsearch
+  #   environment:
+  #     - 'input { gelf { codec => "json" } } output { elasticsearch { hosts => "elasticsearch:9200" } }'
+  #
+  # kibana:
+  #   restart: always
+  #   image: kibana:5.0
+  #   networks:
+  #     - elk
+  #   links:
+  #     - elasticsearch
+  #   ports:
+  #     - '5601:5601'
+
+  # tools:
+  #   build: tools/
+  #   volumes:
+  #     - data:/var/www/html/claroline
 
 volumes:
-  data:
   mysql:
+  data:
